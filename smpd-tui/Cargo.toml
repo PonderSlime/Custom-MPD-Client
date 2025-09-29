@@ -1,5 +1,10 @@
 [package]
-name = "custom-mpd-client"
+name = "smpd-tui"
+description = "simple mpd client tui"
+license = "MIT"
+repository = "https://github.com/ponderslime/SMPD-TUI"
+readme = "../README.md"
+keywords = ["mpd", "ratatui"]
 version = "0.1.0"
 edition = "2024"
 
