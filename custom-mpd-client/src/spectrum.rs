@@ -1,24 +1,36 @@
+extern crate mpd;
 
-use ratatui::{
-    widgets::{Rect, Block, Border, BorderType},
-    style::{Color, Style, Stylize},
-    Frame, Terminal
+use mpd::{Client, State};
+use std::{
+    net::TcpStream,
+    time::{Duration, Instant, SystemTime},
 };
 use crossterm::{
-    event::{self}
+    event::{self, Event, KeyCode, MouseEventKind, MouseEvent, KeyEvent, KeyEventKind},
+    terminal
 };
+use ratatui::{
+    text::{Text, Line},
+    widgets::{ListItem, Paragraph, Widget, List, ListState, Block, Scrollbar, ScrollbarOrientation, ScrollbarState, Borders, BorderType},
+    layout::{Rect, Constraint, Direction, Layout, Margin},
+    style::{Style, Stylize, Color},
+    symbols::{scrollbar, line},
+    Frame,
+    buffer::Buffer,
+};
+use rand::Rng;
 
-pub struct CavaBars<'a> {
-    data: &'a [ua],
+pub struct SpectrumBars<'a> {
+    data: &'a [u8],
 }
 
-pub impl<'a> CavaBars<'a> {
-    fn new(data: &'a [ua]) -> Self {
+impl<'a> SpectrumBars<'a> {
+    pub fn new(data: &'a [u8]) -> Self {
         Self { data }
     }
 }
 
-pub impl<'a> Widget for CavaBars<'a> {
+impl<'a> Widget for SpectrumBars<'a> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
         let height = area.height as u8;
 
@@ -41,15 +53,18 @@ pub impl<'a> Widget for CavaBars<'a> {
 
                 if dots_to_light > 0 {
                     let char_code = match dots_to_light {
-                        1 => 0x2801,
-                        2 => 0x2803,
-                        3 => 0x2807,
-                        4 => 0x280F,
-                        _ => 0x2800,
+                        1 => 0x2582,
+                        2 => 0x2584,
+                        3 => 0x2586,
+                        4 => 0x2588,
+                        //5 => 0x2586,
+                        //6 => 0x2587,
+                        //7 => 0x2588,
+                        _ => 0x200C,
                     };
                     let symbol = char::from_u32(char_code).unwrap_or(' ');
                     let style = Style::default().fg(Color::LightGreen);
-                    buf.get_mut(x, y_coord).set_symbol(symbol).set_style(style);
+                    buf.get_mut(x, y_coord).set_symbol(&symbol.to_string().as_str()).set_style(style);
                 }
             }
         }
@@ -61,3 +76,4 @@ pub impl<'a> Widget for CavaBars<'a> {
             .render(area, buf);
     }
 }
+

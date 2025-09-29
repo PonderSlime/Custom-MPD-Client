@@ -27,6 +27,7 @@ use menus::MenuTabs;
 mod functions;
 use functions::process_queue;
 mod app;
+mod spectrum;
 use app::App;
 fn main() -> std::io::Result<()> {
     let mut terminal = ratatui::init();
