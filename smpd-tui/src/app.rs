@@ -1,22 +1,14 @@
 extern crate mpd;
 
 use mpd::{Client, State};
-use std::{
-    net::TcpStream,
-    time::{Duration, Instant, SystemTime},
-};
-use crossterm::{
-    event::{self, Event, KeyCode, MouseEventKind, MouseEvent, KeyEvent, KeyEventKind},
-    terminal
-};
+use std::time::{Duration, Instant, SystemTime};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
-    text::{Text, Line},
-    widgets::{ListItem, Paragraph, Widget, List, ListState, Block, Scrollbar, ScrollbarOrientation, ScrollbarState, Borders, BorderType},
+    widgets::{List, ListState, Block, Scrollbar, ScrollbarOrientation, ScrollbarState},
     layout::{Rect, Constraint, Direction, Layout, Margin},
-    style::{Style, Stylize, Color},
+    style::{Style, Stylize},
     symbols::{scrollbar, line},
     Frame,
-    buffer::Buffer,
 };
 use rand::Rng;
 
@@ -25,7 +17,6 @@ use crate::spectrum::SpectrumBars;
 
 #[derive(Debug)]
 pub struct App {
-    pub queue: String,
     pub exit: bool,
     pub pause: bool,
     pub vertical_scroll_state: ScrollbarState,
@@ -35,7 +26,8 @@ pub struct App {
     pub last_scroll_time: Option<SystemTime>,
     pub spectrum_data: Vec<u8>,
     pub spectrum_width: u16, 
-    pub target_heights: Vec<f32>,
+    pub spectrum_max_height: f32,
+    pub target_heights: Vec<f32>, 
     pub start_time: Instant,
 }
 
@@ -46,7 +38,6 @@ impl Default for App {
         let num_bars = 40;
 
         Self { 
-            queue: String::new(),
             vertical_scroll_state: ratatui::widgets::ScrollbarState::default(),
             vertical_scroll: 0,
             active_list: Vec::new(),
@@ -57,6 +48,7 @@ impl Default for App {
             list_state, 
             spectrum_data: vec![1; num_bars],
             spectrum_width: num_bars as u16,
+            spectrum_max_height: 0.0,
             target_heights: vec![1.0; num_bars], 
             start_time: Instant::now(),
         }
@@ -111,7 +103,7 @@ impl App {
         const MAX_HEIGHT: f32 = 400.0;
         const ATTACK_FACTOR: f32 = 0.325; 
         const DECAY_FACTOR: f32 = 0.10;  
-        const WAVE_MULT_FACTOR: f32 = 7.0;
+        let wave_mult_factor: f32 = self.spectrum_max_height / 8.0;
         let status = conn.status()?;
         let time = self.start_time.elapsed().as_secs_f32();
         let num_bars_f32 = self.spectrum_data.len() as f32;
@@ -123,14 +115,14 @@ impl App {
             
             if status.state == State::Play {
                 // bass
-                let wave_low = ((time / 5.0).sin() * 0.5 + 0.5) * (5.0 * WAVE_MULT_FACTOR) * (rng.random_range(0.75..1.0) as f32); 
+                let wave_low = ((time / 5.0).sin() * 0.5 + 0.5) * (5.0 * wave_mult_factor) * (rng.random_range(0.75..1.0) as f32); 
 
                 // mid-range/rhythm 
-                let wave_mid_freq = (time.cos() * 0.5 + 0.5) * (15.0 * WAVE_MULT_FACTOR) * (rng.random_range(0.75..1.0) as f32); 
+                let wave_mid_freq = (time.cos() * 0.5 + 0.5) * (15.0 * wave_mult_factor) * (rng.random_range(0.75..1.0) as f32); 
                 let wave_mid = ((time * 3.0 + bar_index_f32 / 2.0).sin() * 0.5 + 0.5) * wave_mid_freq;
                 
                 // treble/synth
-                let treble_weight = (bar_index_f32 / num_bars_f32).powi(2) * (20.0 * WAVE_MULT_FACTOR) * (rng.random_range(0.75..1.0) as f32);
+                let treble_weight = (bar_index_f32 / num_bars_f32).powi(2) * (20.0 * wave_mult_factor) * (rng.random_range(0.75..1.0) as f32);
                 let wave_high = ((time * 10.0 + bar_index_f32 * 5.0).cos() * 0.5 + 0.5) * treble_weight;
 
                 let raw_target_level = 5.0 + wave_low + wave_mid + wave_high;
@@ -171,17 +163,18 @@ impl App {
     pub fn run(&mut self, terminal: &mut ratatui::DefaultTerminal, conn: &mut Client) -> std::io::Result<()> {
         while !self.exit {
             self.last_scroll_time = Some(SystemTime::now());
-            //self.spectrum_data = vec![0; 40];
-            self.update_spectrum_data(conn);
-            terminal.draw(|frame| {
+
+            let _ = self.update_spectrum_data(conn);
+            let _ = terminal.draw(|frame| {
                 let size = frame.area();
-                let mut conn = Client::connect("127.0.0.1:6600").unwrap();
+                let conn = Client::connect("127.0.0.1:6600").unwrap();
                 let chunks = Layout::default()
                     .direction(Direction::Horizontal)
                     .constraints([Constraint::Percentage(59), Constraint::Percentage(1), Constraint::Percentage(40)])
                     .split(size);
                 let list = &process_queue(conn);
                 self.draw_list(frame, chunks[0], list);
+                self.spectrum_max_height = chunks[2].height as f32;
                 if self.spectrum_width != chunks[2].width {
                     self.spectrum_data.resize(chunks[2].width as usize, 0);
                     self.target_heights.resize(chunks[2].width as usize, 0 as f32);
@@ -203,14 +196,13 @@ impl App {
                 frame.render_widget(cava_widget, chunks[2]);
                
             });
-            self.handle_events();
+            let _ = self.handle_events();
        
         }
         Ok(())
             
     }
     pub fn draw_list(&mut self, frame: &mut Frame<'_>, layout: Rect, list: &Vec<String>) {
-        let size = frame.area();
         if self.active_list != list.clone() {
             self.active_list = list.clone();
         }
@@ -256,10 +248,10 @@ impl App {
     fn play_pause(&mut self) {
         let mut conn = Client::connect("127.0.0.1:6600").unwrap();
         if self.pause == true {
-            conn.pause(true);
+            let _ = conn.pause(true);
             self.pause = false;
         } else {
-            conn.pause(false);
+            let _ = conn.pause(false);
             self.pause = true;
         }
     }

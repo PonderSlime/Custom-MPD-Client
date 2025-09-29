@@ -1,26 +1,9 @@
 extern crate mpd;
 
 use mpd::Client;
-use std::{
-    net::TcpStream,
-    time::{Duration, Instant, SystemTime},
-};
 
 use regex::Regex;
 
-use crossterm::{
-    event::{self, Event, KeyCode, MouseEventKind, MouseEvent, KeyEvent, KeyEventKind},
-    terminal
-};
-use ratatui::{
-    text::{Text, Line},
-    widgets::{ListItem, Paragraph, Widget, List, ListState, Block, Scrollbar, ScrollbarOrientation, ScrollbarState},
-    layout::{Rect, Constraint, Direction, Layout, Margin},
-    style::{Style, Stylize},
-    symbols::scrollbar,
-    Frame,
-    buffer::Buffer,
-};
 
 pub fn process_queue(mut conn: Client) -> Vec<String> {
     let mut list_items = vec![];

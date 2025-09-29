@@ -1,24 +1,10 @@
 extern crate mpd;
 
-use mpd::{Client, State};
-use std::{
-    net::TcpStream,
-    time::{Duration, Instant, SystemTime},
-};
-use crossterm::{
-    event::{self, Event, KeyCode, MouseEventKind, MouseEvent, KeyEvent, KeyEventKind},
-    terminal
-};
 use ratatui::{
-    text::{Text, Line},
-    widgets::{ListItem, Paragraph, Widget, List, ListState, Block, Scrollbar, ScrollbarOrientation, ScrollbarState, Borders, BorderType},
-    layout::{Rect, Constraint, Direction, Layout, Margin},
-    style::{Style, Stylize, Color},
-    symbols::{scrollbar, line},
-    Frame,
-    buffer::Buffer,
+    widgets::{Widget, Block, Borders, BorderType},
+    layout::Rect,
+    style::{Style, Color},
 };
-use rand::Rng;
 
 pub struct SpectrumBars<'a> {
     data: &'a [u8],
@@ -64,7 +50,10 @@ impl<'a> Widget for SpectrumBars<'a> {
                     };
                     let symbol = char::from_u32(char_code).unwrap_or(' ');
                     let style = Style::default().fg(Color::LightGreen);
-                    buf.get_mut(x, y_coord).set_symbol(&symbol.to_string().as_str()).set_style(style);
+                    if let Some(cell) = buf.cell_mut((x, y_coord)) {
+                        cell.set_symbol(&symbol.to_string());
+                        cell.set_style(style);
+                    } 
                 }
             }
         }
